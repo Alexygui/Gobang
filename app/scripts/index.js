@@ -17,7 +17,7 @@ const Gobang = contract(gobangArtifact)
 
 let canvas = document.getElementById('chess')
 let context = canvas.getContext('2d')
-let me = true // 判断该轮黑白棋落子权
+let isBlack = true // 判断该轮黑白棋落子权
 let over = false // 判断游戏是否结束
 let chessBoard = [] // 棋盘二维数组,存储棋盘信息
 let isPlaying = false // 是否正在进行游戏
@@ -46,7 +46,8 @@ const App = {
     let self = this
 
     window.gobang.joinGame({
-      from: web3.eth.accounts[0]
+      from: web3.eth.accounts[0],
+      value: '1000000000000000000'
     }).then(function (re) {
       self.cleanChess()
       self.drawChess()
@@ -56,11 +57,10 @@ const App = {
       timeout = setInterval(function () {
         self.getNewestState()
       }, 3000)
-    })
-      .catch(function (e) {
-        console.log(e)
+    }).catch(function (e) {
+      console.log(e)
       // self.setStatus('Error sending coin; see log.')
-      })
+    })
   },
 
   getNewestState: function () {
@@ -116,21 +116,23 @@ const App = {
      * 绘制棋子
      * @param i     棋子x轴位置
      * @param j     棋子y轴位置
-     * @param me    棋子颜色
+     * @param isBlack    棋子颜色
      */
-  oneStep: function (i, j, me) {
+  oneStep: function (i, j, isBlack) {
+    this.getNewestState()
     context.beginPath()
     context.arc(15 + i * 30, 15 + j * 30, 13, 0, 2 * Math.PI)
     context.closePath()
     let gradient = context.createRadialGradient(15 + i * 30 + 2, 15 + j * 30 - 2,
       13, 15 + i * 30 + 2, 15 + j * 30 - 2, 0)
-    if (me) {
+    if (isBlack) {
       gradient.addColorStop(0, '#D1D1D1')
       gradient.addColorStop(1, '#F9F9F9')
     } else {
       gradient.addColorStop(0, '#0A0A0A')
       gradient.addColorStop(1, '#636766')
     }
+    window.gobang.oneStep(i, j)
     context.fillStyle = gradient
     context.fill()
   }
@@ -182,7 +184,7 @@ canvas.onclick = function (e) {
   // 如果该位置没有棋子,则允许落子
   if (chessBoard[i][j] === 0) {
     // 绘制棋子(玩家)
-    App.oneStep(i, j, me)
+    App.oneStep(i, j, isBlack)
     // 改变棋盘信息(该位置有棋子)
     chessBoard[i][j] = 1
   }

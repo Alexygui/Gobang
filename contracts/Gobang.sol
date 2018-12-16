@@ -1,146 +1,151 @@
-pragma solidity ^0.4.17;
+pragma solidity ^0.4.23;
 
 
 contract Gobang {
-    address owner;
-
-    struct Player {
-    address id;
-    int8 lastX;
-    int8 lastY;
-    }
-
-    Player playerBlack;
-
-    Player playerWhite;
+    address[2] public players;
+    //是哪个选手的轮次
+    uint8 playerTurn;
 
     uint128 BET_MONEY = 1 ether;
 
-    bool isBlackPlay = true;
+    //游戏状态：0-未开始，1-游戏中，2-已结束
+    enum GameStatus {start, playing, over}
+    GameStatus playStatus;
 
-    bool isPlaying = false;
+    uint constant boardSize = 15;
 
-    uint8[15][15] chessboard;
+    uint8[boardSize][boardSize] chessboard;
 
-    address winner;
+    //统计棋子的数量
+    uint8 stone_num;
+
+    uint8 winner;
 
     mapping (address => uint128) playersMoney;
-    // 三维数组记录横向，纵向，左斜，右斜的移动
-    int8[2][2][4] dir = [
-    [[int8(- 1), int8(0)], [int8(1), int8(0)]], // 横向
-    [[int8(0), int8(- 1)], [int8(0), int8(1)]], // 竖着
-    [[int8(- 1), int8(- 1)], [int8(1), int8(1)]], // 左斜
-    [[int8(1), int8(- 1)], [int8(- 1), int8(1)]]            // 右斜
-    ];
 
 
-    function Gobang() public {
-        //    constructor() public {
-        initGame();
-        owner = msg.sender;
+    event OneStep(uint8 x, uint8 y);
+
+    event GameOver(uint8 winner);
+
+    constructor() public {
+        players[0] = 0x0;
+        players[1] = 0x0;
+        playerTurn = 0;
+        playStatus = GameStatus.start;
+        winner = 0;
     }
 
+    //加入游戏
     function joinGame() public payable {
-        require(playerBlack.id == 0x0 || playerWhite.id == 0x0);
+        require(players[0] == 0x0 || players[1] == 0x0, "Can not join game");
         require(msg.value >= BET_MONEY);
-        if (playerBlack.id == 0x0) {
-            playerBlack.id = msg.sender;
+        if (players[0] == 0x0) {
+            players[0] = msg.sender;
+        }
+        else if (players[1] == 0x0) {
+            players[1] = msg.sender;
+        }
+        if (players[0] != 0x0 && players[1] != 0x0) {
+            playStatus = GameStatus.playing;
+        }
+    }
+
+    //玩家落子
+    function oneStep(uint8 _x, uint8 _y) public returns (address) {
+        require(playStatus != GameStatus.over, "Game is over");
+        require(playStatus != GameStatus.start, "Game is not start");
+        require(msg.sender == players[playerTurn - 1], "Not your turn");
+        require(checkBoundary(_x, _y), "Out of boundary");
+        require(chessboard[_x][_y] == 0, "Can not move chess here");
+
+        //放置棋子
+        chessboard[_x][_y] = playerTurn;
+        stone_num++;
+        emit OneStep(_x, _y);
+
+        // 检查是否五子连珠
+        if (checkFive(_x, _y, 1, 0) || // 水平方向
+        checkFive(_x, _y, 0, 1) || // 垂直方向
+        checkFive(_x, _y, 1, 1) || // 左上到右下方向
+        checkFive(_x, _y, 1, - 1)) {// 右上到左下方向
+            winGame(playerTurn);
+            // 五子连珠达成，当前用户胜利
+            return;
+        }
+
+        if (stone_num == 225) {
+            // 棋盘放满，和局
+            playStatus = GameStatus.over;
+            playerTurn = 0;
+            emit GameOver(0);
         }
         else {
-            playerWhite.id = msg.sender;
-        }
-        if (playerBlack.id != 0x0 && playerWhite.id != 0x0) {
-            isPlaying = true;
-        }
-    }
-
-    function oneStep(int8 x, int8 y) public returns (address) {
-        bool isBlackStep = isBlackPlay && playerBlack.id == msg.sender;
-        bool isWhiteStep = !isBlackPlay && playerWhite.id == msg.sender;
-        require(chessboard[uint(x)][uint(y)] == 0 && (isBlackStep || isWhiteStep));
-
-        if (isBlackStep) {
-            chessboard[uint(x)][uint(y)] = 1;
-            playerBlack.lastX = x;
-            playerBlack.lastY = y;
-        }
-        else if (isWhiteStep) {
-            chessboard[uint(x)][uint(y)] = 2;
-            playerWhite.lastX = x;
-            playerWhite.lastY = y;
-        }
-
-        bool isWin = checkWinner(x, y);
-        if (isWin) {
-            if (isBlackPlay) {
-                winner = playerBlack.id;
-                playersMoney[playerWhite.id] -= BET_MONEY;
-                playersMoney[winner] += BET_MONEY;
+            // 修改下一步棋的落子方
+            if (playerTurn == 1) {
+                playerTurn = 2;
             }
             else {
-                winner = playerWhite.id;
-                playersMoney[playerBlack.id] -= BET_MONEY;
-                playersMoney[winner] += BET_MONEY;
+                playerTurn = 1;
             }
-            initGame();
-            return winner;
+            playStatus = GameStatus.playing;
         }
-        isBlackPlay = !isBlackPlay;
-        return 0x0;
     }
 
-    function checkWinner(int8 x, int8 y) internal view returns (bool) {
-        uint8 max = 0;
-        int8 tempX = x;
-        int8 tempY = y;
-        for (uint i = 0; i < 4; i++) {
-            uint8 count = 1;
-            //j为0,1分别为棋子的两边方向，比如对于横向的时候，j=0,表示下棋位子的左边，j=1的时候表示右边
-            for (uint j = 0; j < 2; j++) {
-                bool flag = true;
-                // while语句中为一直向某一个方向遍历
-                // 有相同颜色的棋子的时候，Count++
-                // 否则置flag为false，结束该该方向的遍历
-                while (flag) {
-                    tempX = tempX + dir[i][j][0];
-                    tempY = tempY + dir[i][j][1];
-                    if (chessboard[uint(tempX)][uint(tempY)] == chessboard[uint(x)][uint(y)]
-                    && tempX >= 0 && tempX < 15 && tempY >= 0 && tempY < 15) {
-                        count++;
-                    }
-                    else {
-                        flag = false;
-                    }
-                }
-                tempX = x;
-                tempY = y;
-            }
-            if (count >= 5) {
-                max = 1;
-                break;
-            }
-            else {
-                max = 0;
-            }
-        }
-        return max == 1;
-    }
-
-    function getNewestState() public view returns (bool, bool, int8, int8, int8, int8) {
-        return (isPlaying, isBlackPlay, playerBlack.lastX, playerBlack.lastY, playerWhite.lastX, playerWhite.lastY);
+    function getNewestState() public view returns (uint8[15][15], address, GameStatus) {
+        return (chessboard, players[playerTurn], playStatus);
     }
 
     function getMyMoney() public {
         uint senderMoney = playersMoney[msg.sender];
-        require(senderMoney > 0 && address(this).balance >= senderMoney && playerBlack.id == 0x0);
+        require(playStatus == GameStatus.over, "Game is not over");
+        require(senderMoney > 0, "You have got your money");
+        require(address(this).balance >= senderMoney, "I have no enough money");
         address(msg.sender).transfer(senderMoney);
     }
 
-    function initGame() private {
-        playerBlack = Player(0x0, - 1, - 1);
-        playerWhite = Player(0x0, - 1, - 1);
-        isBlackPlay = true;
-        isPlaying = false;
-        winner = 0x0;
+
+    //检查边界
+    function checkBoundary(uint8 _x, uint8 _y) private pure returns (bool) {
+        return (_x < boardSize && _y < boardSize);
+    }
+
+    //检查是否五子连珠
+    function checkFive(uint8 _x, uint8 _y, int _xdir, int _ydir) private view returns (bool) {
+        uint8 count = 0;
+        count += countChess(_x, _y, _xdir, _ydir);
+        // 检查反方向
+        count += countChess(_x, _y, - 1 * _xdir, - 1 * _ydir) - 1;
+        if (count >= 5) {
+            return true;
+        }
+        return false;
+    }
+
+    //数棋子的数量
+    function countChess(uint8 _x, uint8 _y, int _xdir, int _ydir) private view returns (uint8) {
+        uint8 count = 1;
+        while (count <= 5) {
+            uint8 x = uint8(int8(_x) + _xdir * count);
+            uint8 y = uint8(int8(_y) + _ydir * count);
+            if (checkBoundary(x, y) && chessboard[x][y] == chessboard[_x][_y]) {
+                count += 1;
+            }
+            else {
+                return count;
+            }
+        }
+    }
+
+    //标记胜出者
+    function winGame(uint8 _winner) private {
+        require(0 <= _winner && _winner <= 2, "invalid winner state");
+        winner = _winner;
+        // 游戏结束
+        if (winner != 0) {
+            playStatus = GameStatus.over;
+            playerTurn = 0;
+            emit GameOver(winner);
+        }
     }
 }
