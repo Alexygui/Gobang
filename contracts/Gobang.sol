@@ -2,8 +2,12 @@ pragma solidity ^0.4.23;
 
 
 contract Gobang {
-    address[2] public players;
-    //是哪个选手的轮次
+    struct Player {
+    address id;
+    uint128 money;
+    }
+    Player[2] public players;
+    //是哪个选手的轮次:0-noone;1-player1;2-player2
     uint8 playerTurn;
 
     uint128 BET_MONEY = 1 ether;
@@ -28,34 +32,35 @@ contract Gobang {
 
     event GameOver(uint8 winner);
 
-    constructor() public {
-        players[0] = 0x0;
-        players[1] = 0x0;
+    function Gobang() public {
+        players[0].id = 0x0;
+        players[1].id = 0x0;
         playerTurn = 0;
         playStatus = GameStatus.start;
         winner = 0;
     }
 
     //加入游戏
-    function joinGame() public payable {
-        require(players[0] == 0x0 || players[1] == 0x0, "Can not join game");
+    function joinGame() public payable returns (uint8) {
+        require(players[0].id == 0x0 || players[1].id == 0x0, "Can not join game");
         require(msg.value >= BET_MONEY);
-        if (players[0] == 0x0) {
-            players[0] = msg.sender;
+        if (players[0].id == 0x0) {
+            players[0].id = msg.sender;
+            return 1;
         }
-        else if (players[1] == 0x0) {
-            players[1] = msg.sender;
-        }
-        if (players[0] != 0x0 && players[1] != 0x0) {
+        else if (players[1].id == 0x0) {
+            players[1].id = msg.sender;
             playStatus = GameStatus.playing;
+            playerTurn = 1;
+            return 2;
         }
     }
 
     //玩家落子
     function oneStep(uint8 _x, uint8 _y) public returns (address) {
         require(playStatus != GameStatus.over, "Game is over");
-        require(playStatus != GameStatus.start, "Game is not start");
-        require(msg.sender == players[playerTurn - 1], "Not your turn");
+        require(playStatus != GameStatus.start, "Game is preparing");
+        require(msg.sender == players[playerTurn - 1].id, "Not your turn");
         require(checkBoundary(_x, _y), "Out of boundary");
         require(chessboard[_x][_y] == 0, "Can not move chess here");
 
@@ -93,7 +98,7 @@ contract Gobang {
     }
 
     function getNewestState() public view returns (uint8[15][15], address, GameStatus) {
-        return (chessboard, players[playerTurn], playStatus);
+        return (chessboard, players[playerTurn].id, playStatus);
     }
 
     function getMyMoney() public {
@@ -145,6 +150,13 @@ contract Gobang {
         if (winner != 0) {
             playStatus = GameStatus.over;
             playerTurn = 0;
+            if (winner == 1) {
+                players[0].money += BET_MONEY;
+                players[1].money -= BET_MONEY;
+            }else {
+                players[0].money -= BET_MONEY;
+                players[1].money += BET_MONEY;
+            }
             emit GameOver(winner);
         }
     }

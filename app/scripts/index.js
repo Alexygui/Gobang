@@ -38,13 +38,12 @@ const App = {
 
     Gobang.deployed().then(function (instance) {
       window.gobang = instance
-      console.log(window.gobang)
+      console.log('gobang:' + window.gobang)
     })
   },
 
   joinGame: function () {
     let self = this
-
     window.gobang.joinGame({
       from: web3.eth.accounts[0],
       value: '1000000000000000000'
