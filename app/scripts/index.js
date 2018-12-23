@@ -18,17 +18,18 @@ const Gobang = contract(gobangArtifact)
 let canvas = document.getElementById('chess')
 let context = canvas.getContext('2d')
 let isBlack = true // 判断该轮黑白棋落子权
-let over = false // 判断游戏是否结束
+let isMyTurn = false // 判断是否是当前用户落子
+let playStatus // 游戏状态：0-未开始，1-游戏中，2-已结束
 let chessBoard = [] // 棋盘二维数组,存储棋盘信息
-let isPlaying = false // 是否正在进行游戏
+// let isPlaying = false // 是否正在进行游戏
 let timeout // 间隔请求状态的时间
 
 const App = {
   start: function () {
     // 初始化棋盘信息
-    for (var i = 0; i < 15; i++) {
+    for (let i = 0; i < 15; i++) {
       chessBoard[i] = []
-      for (var j = 0; j < 15; j++) {
+      for (let j = 0; j < 15; j++) {
         chessBoard[i][j] = 0
       }
     }
@@ -38,44 +39,144 @@ const App = {
 
     Gobang.deployed().then(function (instance) {
       window.gobang = instance
-      console.log('gobang:' + window.gobang)
+      console.log('gobang============================')
+      console.log(window.gobang)
+
+      const updateInfo = (error, result) => {
+        if (!error) {
+          this.getNewestState()
+        }
+      }
+
+      const winnerGetMoney = (error, result) => {
+        if (!error) {
+          console.log('winnerGetMoney:')
+          console.log(result)
+          // this.getMyMoney()
+        }
+      }
+
+      instance.OneStep(updateInfo)
+      instance.GameOver(winnerGetMoney)
+
+      instance.getNewestState()
+        .then(function (newestState) {
+          console.log('getNewestState:')
+          console.log(newestState)
+          let playerTurn = parseInt(newestState[0].toString())
+          // console.log('playerTurn:')
+          // console.log(!!playerTurn)
+          // console.log(!playerTurn)
+          if (playerTurn === 0) {
+            // alert('请点击join game')
+            return
+          }
+          this.oneStep
+          this.gameOver = instance.GameOver()
+          document.getElementById('newgamebutton').style.visibility = 'hidden'
+          if (web3.eth.accounts[0] !== newestState[1] && web3.eth.accounts[0] !== newestState[2]) {
+            alert('您不是棋手，无法比赛')
+            return
+          } else if (web3.eth.accounts[0] === newestState[1]) {
+            isBlack = true
+          } else if (web3.eth.accounts[0] === newestState[2]) {
+            isBlack = false
+          }
+          isMyTurn = !(playerTurn - 1) === isBlack
+          playStatus = newestState[3]
+          let chainChessboard = newestState[4]
+          for (let i = 0; i < 15; i++) {
+            chessBoard[i] = []
+            for (let j = 0; j < 15; j++) {
+              chessBoard[i][j] = chainChessboard[i][j]
+              if (chessBoard[i][j]) {
+                this.oneStep(i, j, !(chessBoard[i][j] - 1))
+              }
+            }
+          }
+          this.cleanChess()
+          this.drawChess()
+          console.log('getNewestState:')
+          console.log(newestState)
+
+          clearTimeout(timeout)
+          timeout = setInterval(function () {
+            this.getNewestState()
+          }, 1000)
+        }).catch(function (e) {
+          console.log(e)
+        // this.setStatus('Error sending coin; see log.')
+        })
     })
   },
 
   joinGame: function () {
-    let self = this
+    // let self = this
     window.gobang.joinGame({
       from: web3.eth.accounts[0],
       value: '1000000000000000000'
     }).then(function (re) {
-      self.cleanChess()
-      self.drawChess()
-      self.setStatus('Transaction complete!')
+      this.cleanChess()
+      this.drawChess()
+      this.setStatus('Transaction complete!')
       console.log('joinGame:' + re)
 
+      clearTimeout(timeout)
       timeout = setInterval(function () {
-        self.getNewestState()
-      }, 3000)
+        this.getNewestState()
+      }, 1000)
     }).catch(function (e) {
       console.log(e)
-      // self.setStatus('Error sending coin; see log.')
+      // this.setStatus('Error sending coin; see log.')
     })
   },
 
   getNewestState: function () {
-    window.gobang.getNewestState({ from: web3.eth.accounts[0] })
-      .then(function (re) {
-        console.log('getNewestState:' + re)
-        if (!isPlaying) {
-        // 清除循环执行
-          clearInterval(timeout)
+    window.gobang.getNewestState() // { from: web3.eth.accounts[0] }
+      .then(function (newestState) {
+        console.log('getNewestState:')
+        console.log(newestState)
+        let playerTurn = parseInt(newestState[0].toString())
+        if (playerTurn === 0) {
+          document.getElementById('newgamebutton').style.visibility = 'visible'
+          // alert('请点击join game加入游戏')
+          return
+        } else if (playerTurn === 2 && web3.eth.accounts[0] === newestState[1]) {
+
         }
-      }).then(function (data) {
-        console.log('getNewestState:' + data)
-      // self.setStatus('Transaction complete!')
+        document.getElementById('newgamebutton').style.visibility = 'hidden'
+        if (web3.eth.accounts[0] !== newestState[1] && web3.eth.accounts[0] !== newestState[2]) {
+          alert('您不是棋手，无法比赛')
+          return
+        } else if (web3.eth.accounts[0] === newestState[1]) {
+          isBlack = true
+        } else if (web3.eth.accounts[0] === newestState[2]) {
+          isBlack = false
+        }
+        isMyTurn = !(playerTurn - 1) === isBlack
+        playStatus = newestState[3]
+        let chainChessboard = newestState[4]
+        for (let i = 0; i < 15; i++) {
+          chessBoard[i] = []
+          for (let j = 0; j < 15; j++) {
+            chessBoard[i][j] = chainChessboard[i][j]
+            if (chessBoard[i][j]) {
+              this.oneStep(i, j, !(chessBoard[i][j] - 1))
+            }
+          }
+        }
+        this.cleanChess()
+        this.drawChess()
+        console.log('getNewestState:')
+        console.log(newestState)
+
+        clearTimeout(timeout)
+        timeout = setInterval(function () {
+          this.getNewestState()
+        }, 1000)
       }).catch(function (e) {
         console.log(e)
-      // self.setStatus('Error sending coin; see log.')
+      // this.setStatus('Error sending coin; see log.')
       })
   },
 
@@ -85,16 +186,16 @@ const App = {
   },
 
   /**
-     * 清除棋盘
-     */
+   * 清除棋盘
+   */
   cleanChess: function () {
     context.fillStyle = '#FFFFFF'
     context.fillRect(0, 0, canvas.width, canvas.height)
   },
 
   /**
-     * 绘制棋盘
-     */
+   * 绘制棋盘
+   */
   drawChess: function () {
     for (let i = 0; i < 15; i++) {
       context.strokeStyle = '#BFBFBF'
@@ -112,11 +213,11 @@ const App = {
   },
 
   /**
-     * 绘制棋子
-     * @param i     棋子x轴位置
-     * @param j     棋子y轴位置
-     * @param isBlack    棋子颜色
-     */
+   * 绘制棋子
+   * @param i     棋子x轴位置
+   * @param j     棋子y轴位置
+   * @param isBlack    棋子颜色
+   */
   oneStep: function (i, j, isBlack) {
     this.getNewestState()
     context.beginPath()
@@ -134,6 +235,17 @@ const App = {
     window.gobang.oneStep(i, j)
     context.fillStyle = gradient
     context.fill()
+  },
+
+  // 胜利玩家获取游戏奖励
+  getMyMoney: function () {
+    window.gobang.getMyMoney() // { from: web3.eth.accounts[0] }
+      .then(function (re) {
+        console.log('getMyMoney:')
+        console.log(re)
+      }).catch((err) => {
+        console.log(err)
+      })
   }
 }
 
@@ -144,20 +256,20 @@ window.addEventListener('load', function () {
   if (typeof web3 !== 'undefined') {
     console.warn(
       'Using web3 detected from external source.' +
-            ' If you find that your accounts don\'t appear or you have 0 Gobang,' +
-            ' ensure you\'ve configured that source properly.' +
-            ' If using MetaMask, see the following link.' +
-            ' Feel free to delete this warning. :)' +
-            ' http://truffleframework.com/tutorials/truffle-and-metamask'
+      ' If you find that your accounts don\'t appear or you have 0 Gobang,' +
+      ' ensure you\'ve configured that source properly.' +
+      ' If using MetaMask, see the following link.' +
+      ' Feel free to delete this warning. :)' +
+      ' http://truffleframework.com/tutorials/truffle-and-metamask'
     )
     // Use Mist/MetaMask's provider
     window.web3 = new Web3(web3.currentProvider)
   } else {
     console.warn(
       'No web3 detected. Falling back to http://127.0.0.1:9545.' +
-            ' You should remove this fallback when you deploy live, as it\'s inherently insecure.' +
-            ' Consider switching to Metamask for development.' +
-            ' More info here: http://truffleframework.com/tutorials/truffle-and-metamask'
+      ' You should remove this fallback when you deploy live, as it\'s inherently insecure.' +
+      ' Consider switching to Metamask for development.' +
+      ' More info here: http://truffleframework.com/tutorials/truffle-and-metamask'
     )
     // fallback - use your fallback strategy (local node / hosted node + in-dapp id mgmt / fail)
     window.web3 = new Web3(new Web3.providers.HttpProvider('http://127.0.0.1:8545'))
@@ -171,7 +283,7 @@ window.addEventListener('load', function () {
  * @param e
  */
 canvas.onclick = function (e) {
-  if (over) {
+  if (playStatus !== 1) {
     return
   }
 
@@ -181,7 +293,7 @@ canvas.onclick = function (e) {
   let j = Math.floor(y / 30)
 
   // 如果该位置没有棋子,则允许落子
-  if (chessBoard[i][j] === 0) {
+  if (chessBoard[i][j] === 0 && isMyTurn) {
     // 绘制棋子(玩家)
     App.oneStep(i, j, isBlack)
     // 改变棋盘信息(该位置有棋子)

@@ -97,8 +97,8 @@ contract Gobang {
         }
     }
 
-    function getNewestState() public view returns (uint8[15][15], address, GameStatus) {
-        return (chessboard, players[playerTurn].id, playStatus);
+    function getNewestState() public view returns (uint8, address, address, GameStatus, uint8[15][15]) {
+        return (playerTurn, players[0].id, players[1].id, playStatus, chessboard);
     }
 
     function getMyMoney() public {
