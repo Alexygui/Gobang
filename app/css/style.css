@@ -19,8 +19,8 @@ header h1{
     max-width: 600px;
 }
 
-header #newgamebutton{
-    display:block;
+header .game_button{
+    display:none;
     margin:20px auto;
 
     width:100px;
@@ -33,7 +33,7 @@ header #newgamebutton{
     border-radius:10px;
     text-decoration:none;
 }
-header #newgamebutton:hover{
+header .game_button:hover{
     background-color:#9f8b77;
 }
 

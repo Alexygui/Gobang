@@ -28,8 +28,8 @@ contract Gobang {
     mapping (address => uint128) playersMoney;
 
 
-    event OneStep(uint8 x, uint8 y);
-
+    event OneStep(uint8 x, uint8 y, uint8 playerTurn);
+    event GameStart();
     event GameOver(uint8 winner);
 
     function Gobang() public {
@@ -52,6 +52,7 @@ contract Gobang {
             players[1].id = msg.sender;
             playStatus = GameStatus.playing;
             playerTurn = 1;
+            emit GameStart();
             return 2;
         }
     }
@@ -67,7 +68,7 @@ contract Gobang {
         //放置棋子
         chessboard[_x][_y] = playerTurn;
         stone_num++;
-        emit OneStep(_x, _y);
+        emit OneStep(_x, _y, playerTurn);
 
         // 检查是否五子连珠
         if (checkFive(_x, _y, 1, 0) || // 水平方向

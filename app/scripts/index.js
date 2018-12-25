@@ -19,13 +19,15 @@ let canvas = document.getElementById('chess')
 let context = canvas.getContext('2d')
 let isBlack = true // 判断该轮黑白棋落子权
 let isMyTurn = false // 判断是否是当前用户落子
+let playerTurn // 当前是谁的落子权利
 let playStatus // 游戏状态：0-未开始，1-游戏中，2-已结束
 let chessBoard = [] // 棋盘二维数组,存储棋盘信息
 // let isPlaying = false // 是否正在进行游戏
-let timeout // 间隔请求状态的时间
+// let timeout // 间隔请求状态的时间
 
 const App = {
   start: function () {
+    let self = this
     // 初始化棋盘信息
     for (let i = 0; i < 15; i++) {
       chessBoard[i] = []
@@ -44,107 +46,75 @@ const App = {
 
       const updateInfo = (error, result) => {
         if (!error) {
-          this.getNewestState()
+          // self.getNewestState()
+          console.log('OneStepEvent==========================')
+          console.log(result)
         }
       }
 
       const winnerGetMoney = (error, result) => {
         if (!error) {
-          console.log('winnerGetMoney:')
+          console.log('WinnerGetMoneyEvent=========================')
           console.log(result)
-          // this.getMyMoney()
+          // self.getMyMoney()
+        }
+      }
+
+      const beginGobang = (error, result) => {
+        if (!error) {
+          self.cleanChess()
+          self.drawChess()
+          self.getNewestState()
+          console.log('GameStartEvent=========================')
+          console.log(result)
         }
       }
 
       instance.OneStep(updateInfo)
       instance.GameOver(winnerGetMoney)
+      instance.GameStart(beginGobang)
 
-      instance.getNewestState()
-        .then(function (newestState) {
-          console.log('getNewestState:')
-          console.log(newestState)
-          let playerTurn = parseInt(newestState[0].toString())
-          // console.log('playerTurn:')
-          // console.log(!!playerTurn)
-          // console.log(!playerTurn)
-          if (playerTurn === 0) {
-            // alert('请点击join game')
-            return
-          }
-          this.oneStep
-          this.gameOver = instance.GameOver()
-          document.getElementById('newgamebutton').style.visibility = 'hidden'
-          if (web3.eth.accounts[0] !== newestState[1] && web3.eth.accounts[0] !== newestState[2]) {
-            alert('您不是棋手，无法比赛')
-            return
-          } else if (web3.eth.accounts[0] === newestState[1]) {
-            isBlack = true
-          } else if (web3.eth.accounts[0] === newestState[2]) {
-            isBlack = false
-          }
-          isMyTurn = !(playerTurn - 1) === isBlack
-          playStatus = newestState[3]
-          let chainChessboard = newestState[4]
-          for (let i = 0; i < 15; i++) {
-            chessBoard[i] = []
-            for (let j = 0; j < 15; j++) {
-              chessBoard[i][j] = chainChessboard[i][j]
-              if (chessBoard[i][j]) {
-                this.oneStep(i, j, !(chessBoard[i][j] - 1))
-              }
-            }
-          }
-          this.cleanChess()
-          this.drawChess()
-          console.log('getNewestState:')
-          console.log(newestState)
-
-          clearTimeout(timeout)
-          timeout = setInterval(function () {
-            this.getNewestState()
-          }, 1000)
-        }).catch(function (e) {
-          console.log(e)
-        // this.setStatus('Error sending coin; see log.')
-        })
+      self.getNewestState(true)
     })
   },
 
   joinGame: function () {
-    // let self = this
+    let self = this
     window.gobang.joinGame({
       from: web3.eth.accounts[0],
       value: '1000000000000000000'
     }).then(function (re) {
-      this.cleanChess()
-      this.drawChess()
-      this.setStatus('Transaction complete!')
-      console.log('joinGame:' + re)
+      // self.cleanChess()
+      // self.drawChess()
+      self.setStatus('Transaction complete!')
+      console.log('joinGame=============================')
+      console.log(re)
 
-      clearTimeout(timeout)
-      timeout = setInterval(function () {
-        this.getNewestState()
-      }, 1000)
+      // clearTimeout(timeout)
+      // timeout = setInterval(function () {
+      //   self.getNewestState()
+      // }, 1000)
     }).catch(function (e) {
       console.log(e)
-      // this.setStatus('Error sending coin; see log.')
+      // self.setStatus('Error sending coin; see log.')
     })
   },
 
-  getNewestState: function () {
+  getNewestState: function (isFirst) {
+    let self = this
     window.gobang.getNewestState() // { from: web3.eth.accounts[0] }
       .then(function (newestState) {
-        console.log('getNewestState:')
+        console.log('getNewestState==========================')
         console.log(newestState)
-        let playerTurn = parseInt(newestState[0].toString())
+        playerTurn = parseInt(newestState[0].toString())
         if (playerTurn === 0) {
-          document.getElementById('newgamebutton').style.visibility = 'visible'
+          document.getElementById('newgamebutton').style.display = 'block'
           // alert('请点击join game加入游戏')
           return
-        } else if (playerTurn === 2 && web3.eth.accounts[0] === newestState[1]) {
-
         }
-        document.getElementById('newgamebutton').style.visibility = 'hidden'
+        // else if (playerTurn === 2 && web3.eth.accounts[0] === newestState[1]) {
+        //
+        // }
         if (web3.eth.accounts[0] !== newestState[1] && web3.eth.accounts[0] !== newestState[2]) {
           alert('您不是棋手，无法比赛')
           return
@@ -154,29 +124,24 @@ const App = {
           isBlack = false
         }
         isMyTurn = !(playerTurn - 1) === isBlack
-        playStatus = newestState[3]
+        playStatus = parseInt(newestState[3].toString())
         let chainChessboard = newestState[4]
+        if (isFirst) {
+          self.cleanChess()
+          self.drawChess()
+        }
         for (let i = 0; i < 15; i++) {
           chessBoard[i] = []
           for (let j = 0; j < 15; j++) {
-            chessBoard[i][j] = chainChessboard[i][j]
+            chessBoard[i][j] = parseInt(chainChessboard[i][j].toString())
             if (chessBoard[i][j]) {
-              this.oneStep(i, j, !(chessBoard[i][j] - 1))
+              self.drawChessPiece(i, j, !(chessBoard[i][j] - 1))
             }
           }
         }
-        this.cleanChess()
-        this.drawChess()
-        console.log('getNewestState:')
-        console.log(newestState)
-
-        clearTimeout(timeout)
-        timeout = setInterval(function () {
-          this.getNewestState()
-        }, 1000)
       }).catch(function (e) {
         console.log(e)
-      // this.setStatus('Error sending coin; see log.')
+      // self.setStatus('Error sending coin; see log.')
       })
   },
 
@@ -219,7 +184,16 @@ const App = {
    * @param isBlack    棋子颜色
    */
   oneStep: function (i, j, isBlack) {
-    this.getNewestState()
+    // this.getNewestState()
+    if (chessBoard[i][j] === 0 && isMyTurn) {
+      window.gobang.oneStep(i, j)
+      this.drawChessPiece(i, j, isBlack)
+      isMyTurn = false
+    }
+  },
+
+  // 绘制棋子
+  drawChessPiece: function (i, j, isBlack) {
     context.beginPath()
     context.arc(15 + i * 30, 15 + j * 30, 13, 0, 2 * Math.PI)
     context.closePath()
@@ -232,7 +206,6 @@ const App = {
       gradient.addColorStop(0, '#0A0A0A')
       gradient.addColorStop(1, '#636766')
     }
-    window.gobang.oneStep(i, j)
     context.fillStyle = gradient
     context.fill()
   },
@@ -294,9 +267,10 @@ canvas.onclick = function (e) {
 
   // 如果该位置没有棋子,则允许落子
   if (chessBoard[i][j] === 0 && isMyTurn) {
+    debugger
     // 绘制棋子(玩家)
     App.oneStep(i, j, isBlack)
     // 改变棋盘信息(该位置有棋子)
-    chessBoard[i][j] = 1
+    chessBoard[i][j] = playerTurn
   }
 }
