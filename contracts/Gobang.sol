@@ -58,7 +58,7 @@ contract Gobang {
     }
 
     //玩家落子
-    function oneStep(uint8 _x, uint8 _y) public returns (address) {
+    function oneStep(uint8 _x, uint8 _y) public {
         require(playStatus != GameStatus.over, "Game is over");
         require(playStatus != GameStatus.start, "Game is preparing");
         require(msg.sender == players[playerTurn - 1].id, "Not your turn");

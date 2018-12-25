@@ -38,6 +38,9 @@ const App = {
 
     // Bootstrap the Gobang abstraction for Use.
     Gobang.setProvider(web3.currentProvider)
+    Gobang.defaults({
+      from: web3.eth.accounts[0]
+    })
 
     Gobang.deployed().then(function (instance) {
       window.gobang = instance
@@ -46,7 +49,7 @@ const App = {
 
       const updateInfo = (error, result) => {
         if (!error) {
-          // self.getNewestState()
+          self.getNewestState()
           console.log('OneStepEvent==========================')
           console.log(result)
         }
@@ -186,7 +189,10 @@ const App = {
   oneStep: function (i, j, isBlack) {
     // this.getNewestState()
     if (chessBoard[i][j] === 0 && isMyTurn) {
-      window.gobang.oneStep(i, j)
+      window.gobang.oneStep(i, j).then((data) => {
+        console.log('oneStepData===============')
+        console.log(data)
+      })
       this.drawChessPiece(i, j, isBlack)
       isMyTurn = false
     }
@@ -267,7 +273,6 @@ canvas.onclick = function (e) {
 
   // 如果该位置没有棋子,则允许落子
   if (chessBoard[i][j] === 0 && isMyTurn) {
-    debugger
     // 绘制棋子(玩家)
     App.oneStep(i, j, isBlack)
     // 改变棋盘信息(该位置有棋子)
