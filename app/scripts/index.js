@@ -22,8 +22,10 @@ let isMyTurn = false // 判断是否是当前用户落子
 let playerTurn // 当前是谁的落子权利
 let playStatus // 游戏状态：0-未开始，1-游戏中，2-已结束
 let chessBoard = [] // 棋盘二维数组,存储棋盘信息
+let roomId = 0
 // let isPlaying = false // 是否正在进行游戏
 // let timeout // 间隔请求状态的时间
+let isFirstGameoverEvent = true
 
 const App = {
   start: function () {
@@ -56,10 +58,17 @@ const App = {
       }
 
       const winnerGetMoney = (error, result) => {
-        if (!error) {
-          console.log('WinnerGetMoneyEvent=========================')
+        if (!error && isFirstGameoverEvent) {
+          console.log('GameOverEvent=========================')
           console.log(result)
-          // self.getMyMoney()
+          let winnerOder = parseInt(result.args.winner.toString())
+          if (!(winnerOder - 1) === isBlack) {
+            alert('you win the bet fund')
+            self.getMyMoney(roomId)
+          } else {
+            alert('you lose the bet fund')
+          }
+          isFirstGameoverEvent = false
         }
       }
 
@@ -77,41 +86,68 @@ const App = {
       instance.GameOver(winnerGetMoney)
       instance.GameStart(beginGobang)
 
+      if (!roomId && sessionStorage.getItem('roomId')) {
+        roomId = parseInt(sessionStorage.getItem('roomId'))
+        document.getElementById('room_id').value = roomId
+      }
       self.getNewestState(true)
+    })
+  },
+
+  createRoom: function () {
+    let self = this
+    roomId = Math.floor(Math.random() * 900000 + 100000)
+    sessionStorage.setItem('roomId', roomId)
+    document.getElementById('room_id').value = roomId
+    window.gobang.createRoom(roomId, {
+      value: '1000000000000000000'
+    }).then((data) => {
+      self.setStatus('Create room success')
+      console.log('createRoom -- roomId=' + roomId)
+      console.log(data)
     })
   },
 
   joinGame: function () {
     let self = this
-    window.gobang.joinGame({
-      from: web3.eth.accounts[0],
-      value: '1000000000000000000'
-    }).then(function (re) {
+    if (document.getElementById('room_id').value) {
+      roomId = parseInt(document.getElementById('room_id').value)
+    }
+    sessionStorage.setItem('roomId', roomId)
+    console.log('joinGame -- roomId=' + roomId)
+    if (roomId && roomId > 100000 && roomId < 1000000) {
+      window.gobang.joinGame(roomId, {
+        value: '1000000000000000000'
+      }).then(function (re) {
       // self.cleanChess()
       // self.drawChess()
-      self.setStatus('Transaction complete!')
-      console.log('joinGame=============================')
-      console.log(re)
+        self.setStatus('Join game success')
+        console.log('joinGame=============================')
+        console.log(re)
 
       // clearTimeout(timeout)
       // timeout = setInterval(function () {
       //   self.getNewestState()
       // }, 1000)
-    }).catch(function (e) {
-      console.log(e)
+      }).catch(function (e) {
+        console.log(e)
       // self.setStatus('Error sending coin; see log.')
-    })
+      })
+    } else {
+      self.setStatus('房间号需为6位数字')
+    }
   },
 
   getNewestState: function (isFirst) {
     let self = this
-    window.gobang.getNewestState() // { from: web3.eth.accounts[0] }
+    window.gobang.getNewestState(roomId) // { from: web3.eth.accounts[0] }
       .then(function (newestState) {
         console.log('getNewestState==========================')
         console.log(newestState)
         playerTurn = parseInt(newestState[0].toString())
         if (playerTurn === 0) {
-          document.getElementById('newgamebutton').style.display = 'block'
+          document.getElementById('creatRoom').style.display = 'block'
+          document.getElementById('joinGame').style.display = 'block'
           // alert('请点击join game加入游戏')
           return
         }
@@ -189,11 +225,11 @@ const App = {
   oneStep: function (i, j, isBlack) {
     // this.getNewestState()
     if (chessBoard[i][j] === 0 && isMyTurn) {
-      window.gobang.oneStep(i, j).then((data) => {
+      window.gobang.oneStep(i, j, roomId).then((data) => {
         console.log('oneStepData===============')
         console.log(data)
+        this.drawChessPiece(i, j, isBlack)
       })
-      this.drawChessPiece(i, j, isBlack)
       isMyTurn = false
     }
   },
@@ -206,11 +242,11 @@ const App = {
     let gradient = context.createRadialGradient(15 + i * 30 + 2, 15 + j * 30 - 2,
       13, 15 + i * 30 + 2, 15 + j * 30 - 2, 0)
     if (isBlack) {
-      gradient.addColorStop(0, '#D1D1D1')
-      gradient.addColorStop(1, '#F9F9F9')
-    } else {
       gradient.addColorStop(0, '#0A0A0A')
       gradient.addColorStop(1, '#636766')
+    } else {
+      gradient.addColorStop(0, '#D1D1D1')
+      gradient.addColorStop(1, '#F9F9F9')
     }
     context.fillStyle = gradient
     context.fill()
@@ -218,9 +254,9 @@ const App = {
 
   // 胜利玩家获取游戏奖励
   getMyMoney: function () {
-    window.gobang.getMyMoney() // { from: web3.eth.accounts[0] }
+    window.gobang.getMyMoney(roomId) // { from: web3.eth.accounts[0] }
       .then(function (re) {
-        console.log('getMyMoney:')
+        console.log('getMyMoney=========================')
         console.log(re)
       }).catch((err) => {
         console.log(err)
