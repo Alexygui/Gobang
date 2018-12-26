@@ -96,16 +96,20 @@ contract Gobang {
         return (rooms[_roomId].playerTurn, rooms[_roomId].players[0].id, rooms[_roomId].players[1].id, rooms[_roomId].playStatus, rooms[_roomId].chessboard);
     }
 
-    function getMyMoney(uint32 _roomId) public {
+    function getMyMoney(uint32 _roomId) payable public  {
         require(rooms[_roomId].playStatus == GameStatus.over || rooms[_roomId].playStatus == GameStatus.start, "The game is playing");
+        require(rooms[_roomId].winner > 0);
         Player player = rooms[_roomId].players[rooms[_roomId].winner - 1];
         require(player.id == msg.sender);
         uint senderMoney = player.money;
-        require(senderMoney  - 0.01 ether > 0, "You have got your money");
+        require(senderMoney > 0, "You have got your money");
         assert(address(this).balance >= senderMoney);
-        address(msg.sender).transfer(senderMoney - 0.01 ether);
+        address(msg.sender).send(senderMoney);
     }
 
+    function getSomething() view public returns (uint something)  {
+        return address(this).balance;
+    }
 
     //检查边界
     function checkBoundary(uint8 _x, uint8 _y) private pure returns (bool) {
